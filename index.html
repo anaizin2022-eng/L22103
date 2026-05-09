@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小獅子的統計大冒險</title>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D Game -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+        .pointer-events-auto { pointer-events: auto; }
+        
+        /* Custom Scrollbar for text area */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Layer -->
+    <div id="ui-layer" class="p-4 md:p-8">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-start">
+            <div class="bg-white/90 backdrop-blur-sm rounded-2xl p-4 shadow-lg border-4 border-orange-300 max-w-sm pointer-events-auto">
+                <h1 class="text-2xl font-bold text-orange-600 mb-1" id="level-title">歡迎來到統計森林</h1>
+                <div class="flex flex-wrap gap-1 mb-2" id="progress-dots">
+                    <!-- Dots will be generated here -->
+                </div>
+                <p class="text-gray-700 text-sm md:text-base font-medium" id="level-desc">
+                    點擊「開始冒險」與小獅子一起學習假設檢定與統計推論！
+                </p>
+            </div>
+
+            <!-- Controls Hint -->
+            <div class="hidden md:block bg-white/80 rounded-xl p-3 shadow text-xs font-bold text-gray-500 pointer-events-auto">
+                🖱️ 滑鼠左鍵拖曳：旋轉視角<br>
+                🔍 滑鼠滾輪：縮放
+            </div>
+        </div>
+
+        <!-- Dialogue / Options Area -->
+        <div class="flex flex-col items-center mb-4 pointer-events-auto">
+            
+            <!-- Message Box -->
+            <div id="message-box" class="bg-yellow-100 border-4 border-yellow-400 rounded-2xl p-4 md:p-6 shadow-xl max-w-2xl w-full mb-4 transform transition-all duration-300 scale-100">
+                <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-2" id="question-text">準備好開始了嗎？</h2>
+                <p class="text-lg md:text-xl text-gray-800 font-bold tracking-wide leading-relaxed hidden mt-4 p-4 bg-white/60 rounded-xl shadow-inner border border-white" id="feedback-text"></p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+                <button onclick="startGame()" class="col-span-1 md:col-span-2 bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-orange-700">
+                    開始冒險！
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Confetti / Success Overlay -->
+    <div id="success-overlay" class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-500">
+        <div class="bg-orange-400 text-white font-black text-center text-3xl md:text-5xl p-8 rounded-3xl shadow-2xl transform rotate-3 scale-110 border-8 border-yellow-300">
+            🦁 恭喜通關！<br><span class="text-2xl">小獅子為你加冕！👑🎉</span>
+        </div>
+    </div>
+
+    <script>
+        // --- 遊戲知識點資料庫 (對應講義) ---
+        const levels = [
+            {
+                chapter: "第一關：基礎名詞 (母體與樣本)",
+                desc: "要搞懂統計，先分清楚「來源」與「特徵」。",
+                question: "小獅子想知道整座森林的平均樹高(母體)，但牠只能量其中50棵(樣本)。這50棵樹算出來的平均高度，叫做什麼？",
+                options: [
+                    { text: "A. 統計量 (Statistic)", correct: true, explanation: "答對囉！因為小獅子只算了「樣本」(50棵樹)，從樣本算出來的數字就叫做「統計量」。如果是整座森林(母體)的真實高度，才叫做「參數」喔！" },
+                    { text: "B. 參數 (Parameter)", correct: false, explanation: "小獅子搖搖頭～參數是描述『母體』(整座森林)特徵的數字，通常是我們想猜但不知道的神祕數字啦。" }
+                ]
+            },
+            {
+                chapter: "第二關：挑選武器 (z檢定出動)",
+                desc: "遇到連續變數，要根據「母體標準差」來選武器。",
+                question: "小獅子想調查森林蘋果的甜度。貓頭鷹博士已經告訴牠「整座森林蘋果甜度的標準差(母體標準差已知)」，這時小獅子該選哪種檢定武器？",
+                options: [
+                    { text: "A. z檢定 (z-test)", correct: true, explanation: "太棒了！只要有神隊友告訴你「母體標準差已知」，或者是你採集的蘋果超級多(樣本大於30)，就可以霸氣地拿出「z檢定」這把大武器！" },
+                    { text: "B. t檢定 (t-test)", correct: false, explanation: "哎呀，拿錯武器了！t檢定通常是用在母體標準差「未知」的時候喔。" }
+                ]
+            },
+            {
+                chapter: "第三關：挑選武器 (t檢定救援)",
+                desc: "現實中，我們通常不知道整座森林的秘密...",
+                question: "隔天，貓頭鷹博士不在，小獅子「不知道」母體標準差，而且牠只摘了15顆蘋果(小樣本)。這時該換哪種武器比較準？",
+                options: [
+                    { text: "A. z檢定", correct: false, explanation: "小獅子跌倒了！不知道母體標準差而且樣本又小，用z檢定算出來的結果會很不準確喔。" },
+                    { text: "B. t檢定 (t-test)", correct: true, explanation: "完全正確！當「不知道母體標準差」而且蘋果又採得少(小樣本)時，就要用包容心比較強的「t檢定」！它的尾巴比較厚，能處理這種充滿不確定性的狀況。" }
+                ]
+            },
+            {
+                chapter: "第四關：雙胞胎武器 (獨立 vs 配對)",
+                desc: "t檢定還分成對付不同敵人的兩種型態！",
+                question: "小獅子想知道「參加魔鬼訓練營的小豬們」，在「第一週」跟「第十週」的跑步速度有沒有進步。這屬於哪種情境？",
+                options: [
+                    { text: "A. 配對樣本 t 檢定", correct: true, explanation: "答對了！因為是「同一批小豬」自己跟自己比(前後測)，所以要把它們「配對」起來看差值，這就是配對樣本t檢定！" },
+                    { text: "B. 獨立樣本 t 檢定", correct: false, explanation: "不對喔～獨立樣本是用在「兩群完全不同的人」，比如說拿小豬跟小羊比，那才是獨立樣本。" }
+                ]
+            },
+            {
+                chapter: "第五關：定罪的門檻 (顯著水準 α)",
+                desc: "要定罪之前，必須先設好「不小心抓錯人」的容忍度。",
+                question: "長老規定這次實驗的「顯著水準 α = 0.05」。小獅子要怎麼白話地解釋這個數字給小兔子聽？",
+                options: [
+                    { text: "A. 我們只允許有 5% 的機率「不小心冤枉好人」。", correct: true, explanation: "聰明！α (阿法) 就是長老設定的「定罪門檻」，也就是我們能容忍「沒病卻說你有病 (冤枉好人 / 型一錯誤)」的最大風險啦！" },
+                    { text: "B. 這是說實驗有 95% 的機率會成功。", correct: false, explanation: "這是陷阱喔！α 不是代表實驗成功的機率，千萬別被數字給騙了。" }
+                ]
+            },
+            {
+                chapter: "第六關：統計錯誤 (冤枉與漏診)",
+                desc: "做決策時，我們可能犯下兩種錯誤。",
+                question: "猴子法官的測謊機壞了，小獅子明明沒有偷吃香蕉(無罪)，測謊機卻嗶嗶叫硬說他偷吃。這是犯了哪種錯誤？",
+                options: [
+                    { text: "A. 型一錯誤 (Type I Error)", correct: true, explanation: "答對了！明明沒事卻說有事(沒病說有病 / 冤枉好人)，這就是「型一錯誤」。如果是小獅子真的偷吃卻沒被抓到，那才是型二錯誤(漏診)喔！" },
+                    { text: "B. 型二錯誤 (Type II Error)", correct: false, explanation: "搞錯囉！型二錯誤是「有病說沒病」(漏掉壞人)。這裡小獅子是被冤枉的，屬於型一錯誤。" }
+                ]
+            },
+            {
+                chapter: "第七關：門檻調高的後果 (α 與檢定力)",
+                desc: "魚與熊掌不可兼得，門檻改變會引發連動效應。",
+                question: "如果長老怕冤枉好人，把顯著水準 α 從 0.05 降到更嚴格的 0.01，會發生什麼事？",
+                options: [
+                    { text: "A. 冤枉好人的機率下降，但漏抓壞人的機率會上升。", correct: true, explanation: "分析得很好！門檻變嚴格了，雖然不容易抓錯人(型一錯誤下降)，但也更容易讓真正的壞人跑掉(型二錯誤上升，也就是檢定力下降囉)。" },
+                    { text: "B. 變得更容易定罪，檢定力大增！", correct: false, explanation: "想反囉！門檻從 0.05 變 0.01 代表標準變高，會「更難」定罪，檢定力其實會下降的。" }
+                ]
+            },
+            {
+                chapter: "第八關：最容易誤解的數字 (p值)",
+                desc: "算出 p值 了！但它到底是什麼意思？",
+                question: "小獅子算出 p值 = 0.01。這個 p值 到底代表什麼白話的意思呢？",
+                options: [
+                    { text: "A. 在「小獅子原本沒偷吃(HO為真)」的前提下，測謊機還嗶嗶叫(發生目前極端數據)的機率。", correct: true, explanation: "滿分！p值就是在「原本沒事(HO)」的狀況下，卻看到現在這個誇張結果的機率。p值越小，代表這件事越不可能是巧合，一定有鬼！" },
+                    { text: "B. 小獅子沒有偷吃香蕉(HO)的機率是 1%。", correct: false, explanation: "大錯特錯！這是考試最愛考的陷阱，p值絕對不是「HO是對的機率」！" }
+                ]
+            },
+            {
+                chapter: "第九關：終極判決 (推翻現狀)",
+                desc: "法官敲下法槌的最後一刻！p值 vs α",
+                question: "小獅子測試新發明的「跑得快藥水」(H1:有效)，算出的 p值 = 0.03，而長老給的門檻 α = 0.05。小獅子可以怎麼宣布？",
+                options: [
+                    { text: "A. p < α，拒絕現狀(HO)，藥水真的有效！", correct: true, explanation: "完美！因為 p值(0.03) 比門檻 α(0.05) 還小，代表發生巧合的機率太低了，證據超級充分！小獅子成功推翻了「藥水沒效(HO)」的假設。" },
+                    { text: "B. p < α，接受現狀(HO)，藥水沒效。", correct: false, explanation: "哎呀，p < α 應該是「拒絕」HO 喔！而且統計上我們絕對不能寫「接受HO」。" }
+                ]
+            },
+            {
+                chapter: "第十關：證據不足的時候",
+                desc: "如果 p值 比門檻還要大怎麼辦？",
+                question: "這次換成「變聰明藥水」，算出來的 p值 = 0.12，大於長老的門檻 α = 0.05。小獅子該怎麼辦？",
+                options: [
+                    { text: "A. 證據不足以拒絕 HO，無法證明藥水有效。", correct: true, explanation: "正確！p值比門檻大，代表證據不夠力。法庭上講求「無罪推定」，證據不夠只能說「無法定罪(證據不足以拒絕HO)」，不能直接斷定牠絕對沒效喔。" },
+                    { text: "B. p > α，證明藥水絕對沒效，直接丟掉！", correct: false, explanation: "太武斷了！我們只能說「目前證據不足以證明有效」，不代表它「絕對無效」。" }
+                ]
+            },
+            {
+                chapter: "第十一關：檢定工具選擇 (ANOVA)",
+                desc: "當組數變多時，t檢定就不夠用了。",
+                question: "森林運動會到了！小獅子想比較「獅子、老虎、黑熊」這【三組】動物的平均力氣有沒有差異。牠應該拿出哪種工具？",
+                options: [
+                    { text: "A. 變異數分析 (ANOVA)", correct: true, explanation: "太神啦！只要是比較「三組(含)以上」的平均數，t檢定就不夠用了，必須請出 ANOVA 大神來幫忙，才不會增加犯錯的機率喔！" },
+                    { text: "B. 獨立樣本 t 檢定", correct: false, explanation: "不行喔！t檢定一次只能比較「兩組」。如果有三組，用t檢定兩兩比較會造成誤差大增！" }
+                ]
+            },
+            {
+                chapter: "第十二關：參數 vs 非參數 (怪異資料救星)",
+                desc: "當資料不符合常態分配或有極端值時該怎麼辦？",
+                question: "小獅子收集了大家的賽跑成績，發現成績圖表嚴重「歪一邊(偏態)」，甚至有幾隻烏龜慢到變成極端值！這時該怎麼做檢定？",
+                options: [
+                    { text: "A. 放棄 t檢定，改用「非參數檢定」", correct: true, explanation: "沒錯沒錯！當資料長得奇形怪狀、有超級極端值，或是題目要看「排名、中位數」時，不要猶豫，立刻換上萬用備胎「非參數檢定」就對了！" },
+                    { text: "B. 假裝沒看到，繼續用 t 檢定", correct: false, explanation: "小獅子搖搖頭～這樣算出來的結果會完全不準的！" }
+                ]
+            },
+            {
+                chapter: "第十三關：α與β的翹翹板效應",
+                desc: "定罪門檻變嚴格了，會發生什麼事呢？",
+                question: "長老決定把定罪門檻(顯著水準 α)從 0.05 改成更嚴格的 0.01。這就像把抓小偷的網子洞變小，會產生什麼「翹翹板效應」？",
+                options: [
+                    { text: "A. 門檻變嚴苛，更難推翻現狀。冤枉好人(型一)下降，但漏抓小偷(型二)上升，檢定力下降。", correct: true, explanation: "沒錯！這就像翹翹板，你不想冤枉好人(型一錯誤↓)，就會變得綁手綁腳，結果讓真正的小偷溜走(型二錯誤↑)，抓出真相的能力(檢定力)就變弱啦！" },
+                    { text: "B. 門檻變嚴苛，所以我們更能輕易抓到所有小偷，檢定力大幅上升！", correct: false, explanation: "小獅子搖搖頭～門檻變嚴格代表「更難定罪」，既然很難定罪，抓出真相的能力(檢定力)當然是下降囉！" }
+                ]
+            },
+            {
+                chapter: "第十四關：蒐集更多情報 (增加樣本數)",
+                desc: "想打破翹翹板的魔咒，唯一的辦法就是...",
+                question: "小獅子為了解決翹翹板難題，決定把調查的蘋果數量(樣本數 n)從 20 顆大幅增加到 60 顆！擁有更多情報後，會發生什麼事？",
+                options: [
+                    { text: "A. 檢定力上升，更容易偵測出真實差異，信賴區間也會變窄！", correct: true, explanation: "完全正確！情報越多，小獅子就越有自信！增加樣本數是統計學裡的王牌，能讓你看得更清楚(檢定力上升)，猜測的範圍也會更精準(信賴區間變窄)！" },
+                    { text: "B. 檢定力下降，因為看太多蘋果眼睛會花，信賴區間會變寬。", correct: false, explanation: "搞錯囉！情報越多當然越好判斷呀！樣本數增加會讓不確定性變小，信賴區間會變窄才對。" }
+                ]
+            },
+            {
+                chapter: "第十五關：大樣本迷思 (實務顯著嗎？)",
+                desc: "統計上有差，就代表現實中值得買單嗎？",
+                question: "小獅子發現了一雙售價 10,000 金幣的「疾風魔法跑鞋」。測試了十萬隻動物後發現，跑馬拉松能提早 0.5 秒抵達終點 (p < 0.05，統計顯著)。你會買嗎？",
+                options: [
+                    { text: "A. 這是大樣本迷思！花 10,000 金幣只快 0.5 秒根本不划算，這叫「實務上不顯著」。", correct: true, explanation: "太聰明了！樣本數超級大的時候，連芝麻綠豆大的差異都會達到統計顯著。但在現實中，我們還要看「效果量」和實務意義，不能盲目崇拜 p值 喔！" },
+                    { text: "B. 既然 p < 0.05 達到統計顯著，就代表這雙鞋真的神速，趕快買爆！", correct: false, explanation: "小獅子笑出來了～花 10,000 金幣只快 0.5 秒，你確定值得嗎？這就是落入只看 p值 的大樣本迷思啦！" }
+                ]
+            },
+            {
+                chapter: "第十六關：ANOVA 的核心直覺 (F值)",
+                desc: "用「變異」來推論「平均」，揪出真正的差異。",
+                question: "小獅子用 ANOVA 比較三組動物。牠發現「組間變異」(各組平均差很多) 遠遠大於「組內變異」(每組內部的雜訊)。算出來的 F 值非常大！這代表什麼？",
+                options: [
+                    { text: "A. 代表各組之間真的有顯著差異，拒絕 HO！", correct: true, explanation: "太神啦！F 值就是「組間變異 / 組內變異」。當組間差距(訊號)明顯大於組內雜訊時，F值就會很大，代表各組真的有差，可以敲槌定罪(拒絕HO)！" },
+                    { text: "B. 代表雜訊太大，完全比不出差異。", correct: false, explanation: "搞錯囉！如果「組內變異」(雜訊)很大，F 值反而會變得很小，那才是比不出差異喔。" }
+                ]
+            },
+            {
+                chapter: "第十七關：ANOVA 必考陷阱",
+                desc: "警報器響了，不代表你知道是哪裡失火！",
+                question: "太好了，ANOVA 顯示 p < 0.05 達到顯著！小獅子開心地說：「這代表A、B、C三組動物，兩兩之間『全部』都有差異！」小獅子說得對嗎？",
+                options: [
+                    { text: "A. 錯！ANOVA 顯著只代表「至少有一組不一樣」，必須做「事後檢定」才知道是誰。", correct: true, explanation: "觀念超正確！ANOVA 只是一個總警報器，響了只代表有異常(顯著)，但你必須進行「事後檢定」(例如 Tukey) 才能抓出到底是哪兩組之間有差異喔！" },
+                    { text: "B. 對！ANOVA 只要顯著，就保證大家都不一樣。", correct: false, explanation: "小獅子掉進陷阱啦！可能只是 A 和 C 有差，但 A 和 B 沒差呀！所以不能說兩兩都有差。" }
+                ]
+            },
+            {
+                chapter: "第十八關：呼叫非參數救援",
+                desc: "遇到奇怪的資料，標準武器會失效。",
+                question: "貓頭鷹博士給了一張清單：資料嚴重偏態、樣本極小、有嚴重離群值(Outliers)、或是題目明確要求比較『中位數』。看到這些關鍵字，該怎麼辦？",
+                options: [
+                    { text: "A. 果斷放棄 t檢定/ANOVA，改選「非參數檢定」！", correct: true, explanation: "反應真快！只要看到這四個關鍵字(偏態、極小、離群值、中位數)，不要猶豫，直接選非參數檢定，它是專門對付怪異資料的救星！" },
+                    { text: "B. 把極端值刪掉，硬是用 t檢定 算到底。", correct: false, explanation: "這樣不行喔～有些時候極端值是很重要的資訊，不能亂刪。直接換成非參數檢定才是正解！" }
+                ]
+            },
+            {
+                chapter: "第十九關：對號入座大挑戰",
+                desc: "看清楚變數的長相，選對專屬的工具。",
+                question: "護士想知道「性別」跟「有沒有生病」有沒有關聯；同時白兔村想比較「兩組」白兔跳躍距離，但資料「嚴重偏態」。這兩個情境分別要用什麼？",
+                options: [
+                    { text: "A. 護士用「卡方獨立性檢定」；白兔村用「Mann-Whitney U 檢定」。", correct: true, explanation: "完美配對！探討兩個類別(性別 vs 有病/沒病)的關聯，要用「卡方獨立性」；而兩組比較但嚴重偏態(獨立樣本t的非參數備胎)，就是「Mann-Whitney U 檢定」！(另外如果是看實際比例是否1:1，則是用卡方適配度喔)" },
+                    { text: "B. 護士用「卡方適配度檢定」；白兔村用「配對樣本 t檢定」。", correct: false, explanation: "弄混囉！卡方適配度是用來測「實際比例是不是 1:1」；而配對樣本 t檢定必須是「同一批人」前後測，而且不能嚴重偏態喔。" }
+                ]
+            },
+            {
+                chapter: "第二十關：終極陷阱大串燒",
+                desc: "考試最愛考的觀念，一次全部閃過！",
+                question: "來到最後一關，牆上寫著兩段話。哪一段才是沒有踩到任何陷阱的「統計學真理」？",
+                options: [
+                    { text: "A. 「相關不代表因果」且「p ≤ α 才能拒絕HO (絕不說接受HO)」。", correct: true, explanation: "統計獅子王就是你！這兩句話是統計學鐵律！另外也要小心 CI 陷阱：95%信賴區間的意義是重複抽樣「包含母體」的比例，絕對不能解釋成「機率」喔！非參數三寶：U、Wilcoxon、Kruskal-Wallis 也要背熟！" },
+                    { text: "B. 「相關性很高代表有因果關係」且「95%信賴區間代表母體有95%的機率在裡面」。", correct: false, explanation: "轟隆隆！你踩到兩個最大的地雷啦！高度相關不一定是誰造成誰；而且母體參數是固定的數字，不會有機率問題，信賴區間不能用機率來解釋！" }
+                ]
+            }
+        ];
+
+        let currentLevel = -1;
+        
+        // --- UI Logic ---
+        const titleEl = document.getElementById('level-title');
+        const descEl = document.getElementById('level-desc');
+        const questionEl = document.getElementById('question-text');
+        const feedbackEl = document.getElementById('feedback-text');
+        const optionsContainer = document.getElementById('options-container');
+        const progressDots = document.getElementById('progress-dots');
+        const msgBox = document.getElementById('message-box');
+
+        function initProgressDots() {
+            progressDots.innerHTML = '';
+            levels.forEach((_, i) => {
+                const dot = document.createElement('div');
+                dot.className = `w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${i === 0 ? 'bg-orange-500' : 'bg-gray-300'}`;
+                dot.id = `dot-${i}`;
+                progressDots.appendChild(dot);
+            });
+        }
+
+        function updateProgress() {
+            levels.forEach((_, i) => {
+                const dot = document.getElementById(`dot-${i}`);
+                if(dot) {
+                    if (i < currentLevel) dot.className = 'w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-green-500';
+                    else if (i === currentLevel) dot.className = 'w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]';
+                    else dot.className = 'w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-gray-300';
+                }
+            });
+        }
+
+        function startGame() {
+            currentLevel = 0;
+            initProgressDots();
+            updateProgress();
+            loadLevel();
+        }
+
+        function loadLevel() {
+            if (currentLevel >= levels.length) {
+                showEndScreen();
+                return;
+            }
+
+            const levelData = levels[currentLevel];
+            titleEl.textContent = levelData.chapter;
+            descEl.textContent = levelData.desc;
+            questionEl.textContent = levelData.question;
+            feedbackEl.classList.add('hidden');
+            msgBox.classList.remove('border-red-400', 'bg-red-50');
+            msgBox.classList.add('border-yellow-400', 'bg-yellow-100');
+
+            optionsContainer.innerHTML = '';
+            levelData.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = "bg-white hover:bg-orange-50 text-gray-800 font-bold py-4 px-6 rounded-2xl border-4 border-gray-200 hover:border-orange-400 shadow-md transform hover:-translate-y-1 transition-all text-left flex items-center";
+                btn.innerHTML = `<span class="bg-orange-100 text-orange-600 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">${index+1}</span> <span>${opt.text}</span>`;
+                btn.onclick = () => handleAnswer(opt.correct, opt.explanation);
+                optionsContainer.appendChild(btn);
+            });
+            
+            // Move Lion to a new position to simulate walking
+            targetLionPosition.x = (currentLevel - 2) * 5;
+            lionState = 'walk';
+        }
+
+        function handleAnswer(isCorrect, explanation) {
+            optionsContainer.innerHTML = ''; // clear buttons
+            
+            feedbackEl.textContent = explanation;
+            feedbackEl.classList.remove('hidden');
+
+            if (isCorrect) {
+                // Success
+                msgBox.classList.remove('border-yellow-400', 'bg-yellow-100', 'border-red-400', 'bg-red-50');
+                msgBox.classList.add('border-green-400', 'bg-green-50');
+                lionState = 'jump';
+                
+                // Show overlay
+                const overlay = document.getElementById('success-overlay');
+                overlay.classList.remove('opacity-0', 'pointer-events-none');
+                
+                setTimeout(() => {
+                    overlay.classList.add('opacity-0', 'pointer-events-none');
+                    const nextBtn = document.createElement('button');
+                    nextBtn.className = "col-span-1 md:col-span-2 bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-green-700 animate-bounce";
+                    nextBtn.textContent = "前往下一關 ➔";
+                    nextBtn.onclick = () => {
+                        currentLevel++;
+                        updateProgress();
+                        loadLevel();
+                    };
+                    optionsContainer.appendChild(nextBtn);
+                }, 1500);
+
+            } else {
+                // Wrong
+                msgBox.classList.remove('border-yellow-400', 'bg-yellow-100');
+                msgBox.classList.add('border-red-400', 'bg-red-50');
+                lionState = 'shake';
+                
+                const retryBtn = document.createElement('button');
+                retryBtn.className = "col-span-1 md:col-span-2 bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-red-700";
+                retryBtn.textContent = "再試一次 ↺";
+                retryBtn.onclick = () => loadLevel(); // Reload same level
+                optionsContainer.appendChild(retryBtn);
+            }
+        }
+
+        function showEndScreen() {
+            titleEl.textContent = "冒險完成！你是統計獅子王！🦁👑";
+            descEl.textContent = "太厲害了！你已經完美掌握了統計學中最核心的假設檢定觀念。";
+            questionEl.textContent = "考試時記得：\n1. p ≤ α 拒絕HO \n2. ANOVA顯著≠兩兩有差 \n3. 相關不代表因果 \n祝你考試順利，拿滿分！吼～🎉";
+            feedbackEl.classList.add('hidden');
+            
+            optionsContainer.innerHTML = '';
+            const restartBtn = document.createElement('button');
+            restartBtn.className = "col-span-1 md:col-span-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-blue-700";
+            restartBtn.textContent = "重新複習 ↺";
+            restartBtn.onclick = startGame;
+            optionsContainer.appendChild(restartBtn);
+
+            lionState = 'jump'; // Happy lion
+            targetLionPosition.x = 0;
+            targetLionPosition.z = 2;
+        }
+
+        // --- Three.js 3D Setup ---
+        let scene, camera, renderer;
+        let lionGroup;
+        let clouds = [];
+        
+        // Animation states
+        let lionState = 'idle'; // idle, walk, jump, shake
+        let animClock = 0;
+        let targetLionPosition = { x: 0, z: 0 };
+
+        // Camera control variables
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let camTheta = Math.PI / 4; 
+        let camPhi = Math.PI / 3;
+        let camRadius = 15;
+
+        window.onload = function() {
+            init3D();
+            animate();
+        };
+
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB); // Sky blue
+            scene.fog = new THREE.Fog(0x87CEEB, 10, 50);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            updateCameraPosition();
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffdf80, 0.8);
+            dirLight.position.set(10, 15, 10);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.left = -15;
+            dirLight.shadow.camera.right = 15;
+            dirLight.shadow.camera.top = 15;
+            dirLight.shadow.camera.bottom = -15;
+            scene.add(dirLight);
+
+            // Ground
+            const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+            const groundMat = new THREE.MeshLambertMaterial({ color: 0x4CAF50 }); // Grass green
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Path
+            const pathGeo = new THREE.PlaneGeometry(1000, 3);
+            const pathMat = new THREE.MeshLambertMaterial({ color: 0xe0cda9 }); // Dirt road
+            const path = new THREE.Mesh(pathGeo, pathMat);
+            path.rotation.x = -Math.PI / 2;
+            path.position.y = 0.01;
+            path.receiveShadow = true;
+            scene.add(path);
+
+            // Create Lion
+            createLion();
+
+            // Create Environment (Trees, Clouds, Flowers)
+            createEnvironment();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            
+            // Camera Interaction
+            const dom = renderer.domElement;
+            dom.addEventListener('mousedown', (e) => { isDragging = true; });
+            dom.addEventListener('mouseup', () => { isDragging = false; });
+            dom.addEventListener('mouseleave', () => { isDragging = false; });
+            dom.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.movementX || (e.clientX - previousMousePosition.x);
+                    const deltaY = e.movementY || (e.clientY - previousMousePosition.y);
+                    camTheta -= deltaX * 0.005;
+                    camPhi -= deltaY * 0.005;
+                    camPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1, camPhi)); // Clamp vertical
+                    updateCameraPosition();
+                }
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+            // Touch support for mobile
+            dom.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }, {passive: true});
+            dom.addEventListener('touchend', () => { isDragging = false; });
+            dom.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.touches[0].clientX - previousMousePosition.x;
+                    const deltaY = e.touches[0].clientY - previousMousePosition.y;
+                    camTheta -= deltaX * 0.01;
+                    camPhi -= deltaY * 0.01;
+                    camPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.1, camPhi));
+                    updateCameraPosition();
+                }
+                previousMousePosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }, {passive: true});
+            
+            // Zoom
+            dom.addEventListener('wheel', (e) => {
+                camRadius += e.deltaY * 0.01;
+                camRadius = Math.max(5, Math.min(30, camRadius));
+                updateCameraPosition();
+            }, {passive: true});
+        }
+
+        function updateCameraPosition() {
+            // Camera follows lion roughly
+            const targetX = lionGroup ? lionGroup.position.x : 0;
+            
+            camera.position.x = targetX + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+            camera.position.z = camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+            camera.position.y = camRadius * Math.cos(camPhi);
+            camera.lookAt(targetX, 1, 0);
+        }
+
+        function createLion() {
+            lionGroup = new THREE.Group();
+            
+            const lionColor = 0xffa500; // Orange
+            const maneColor = 0x8b4513; // Brown
+            const faceColor = 0xffe4b5; // Light orange
+
+            // Body
+            const bodyGeo = new THREE.CylinderGeometry(0.7, 0.7, 1.5, 16);
+            const bodyMat = new THREE.MeshLambertMaterial({ color: lionColor });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.rotation.z = Math.PI / 2;
+            body.position.y = 1.2;
+            body.castShadow = true;
+            lionGroup.add(body);
+
+            // Head Group
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0.8, 1.6, 0);
+            
+            // Head base
+            const headGeo = new THREE.SphereGeometry(0.6, 16, 16);
+            const headMat = new THREE.MeshLambertMaterial({ color: lionColor });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.castShadow = true;
+            headGroup.add(head);
+
+            // Snout
+            const snoutGeo = new THREE.BoxGeometry(0.5, 0.3, 0.4);
+            const snoutMat = new THREE.MeshLambertMaterial({ color: faceColor });
+            const snout = new THREE.Mesh(snoutGeo, snoutMat);
+            snout.position.set(0.5, -0.1, 0);
+            headGroup.add(snout);
+
+            // Nose
+            const noseGeo = new THREE.BoxGeometry(0.1, 0.1, 0.15);
+            const noseMat = new THREE.MeshLambertMaterial({ color: 0x000000 });
+            const nose = new THREE.Mesh(noseGeo, noseMat);
+            nose.position.set(0.76, 0, 0);
+            headGroup.add(nose);
+
+            // Eyes
+            const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeR.position.set(0.5, 0.2, 0.25);
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeL.position.set(0.5, 0.2, -0.25);
+            headGroup.add(eyeR);
+            headGroup.add(eyeL);
+
+            // Ears
+            const earGeo = new THREE.SphereGeometry(0.2, 8, 8);
+            const earR = new THREE.Mesh(earGeo, headMat);
+            earR.position.set(0, 0.5, 0.4);
+            const earL = new THREE.Mesh(earGeo, headMat);
+            earL.position.set(0, 0.5, -0.4);
+            headGroup.add(earR);
+            headGroup.add(earL);
+
+            // Mane (Procedural puff)
+            const maneMat = new THREE.MeshLambertMaterial({ color: maneColor });
+            for(let i=0; i<12; i++) {
+                const puffGeo = new THREE.SphereGeometry(0.25, 8, 8);
+                const puff = new THREE.Mesh(puffGeo, maneMat);
+                const angle = (i / 12) * Math.PI * 2;
+                puff.position.set(-0.2, Math.cos(angle)*0.6, Math.sin(angle)*0.6);
+                headGroup.add(puff);
+            }
+            // Add a few more behind
+             for(let i=0; i<8; i++) {
+                const puffGeo = new THREE.SphereGeometry(0.25, 8, 8);
+                const puff = new THREE.Mesh(puffGeo, maneMat);
+                const angle = (i / 8) * Math.PI * 2;
+                puff.position.set(-0.4, Math.cos(angle)*0.5, Math.sin(angle)*0.5);
+                headGroup.add(puff);
+            }
+
+            lionGroup.add(headGroup);
+
+            // Legs
+            const legGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.8, 8);
+            const legMat = new THREE.MeshLambertMaterial({ color: lionColor });
+            const createLeg = (x, z) => {
+                const leg = new THREE.Mesh(legGeo, legMat);
+                leg.position.set(x, 0.4, z);
+                leg.castShadow = true;
+                return leg;
+            };
+            lionGroup.add(createLeg(0.5, 0.35)); // Front Right
+            lionGroup.add(createLeg(0.5, -0.35)); // Front Left
+            lionGroup.add(createLeg(-0.5, 0.35)); // Back Right
+            lionGroup.add(createLeg(-0.5, -0.35)); // Back Left
+
+            // Tail
+            const tailGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
+            const tail = new THREE.Mesh(tailGeo, legMat);
+            tail.position.set(-0.9, 1.2, 0);
+            tail.rotation.z = -Math.PI / 4;
+            lionGroup.add(tail);
+            // Tail tip
+            const tipGeo = new THREE.SphereGeometry(0.15, 8, 8);
+            const tip = new THREE.Mesh(tipGeo, maneMat);
+            tip.position.set(-1.2, 1.5, 0);
+            lionGroup.add(tip);
+
+            // Initial position
+            lionGroup.position.set(-10, 0, 0);
+            scene.add(lionGroup);
+        }
+
+        function createEnvironment() {
+            // Trees
+            const treeMat = new THREE.MeshLambertMaterial({ color: 0x2e8b57 }); // Sea green
+            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8b4513 });
+            
+            for(let i=0; i<150; i++) {
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2, 8), trunkMat);
+                trunk.position.y = 1;
+                trunk.castShadow = true;
+                tree.add(trunk);
+                
+                // Randomize tree style (cone or spheres)
+                if (Math.random() > 0.5) {
+                    const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 8), treeMat);
+                    leaves.position.y = 3;
+                    leaves.castShadow = true;
+                    tree.add(leaves);
+                } else {
+                    const leaves = new THREE.Mesh(new THREE.SphereGeometry(1.2, 8, 8), treeMat);
+                    leaves.position.y = 2.5;
+                    leaves.castShadow = true;
+                    tree.add(leaves);
+                    const leaves2 = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), treeMat);
+                    leaves2.position.set(0.5, 3, 0.5);
+                    leaves2.castShadow = true;
+                    tree.add(leaves2);
+                }
+
+                // Random position along the path (expanded for larger ground)
+                const x = (Math.random() - 0.5) * 400;
+                const z = (Math.random() > 0.5 ? 1 : -1) * (3 + Math.random() * 30);
+                tree.position.set(x, 0, z);
+                scene.add(tree);
+            }
+
+            // Flowers (Flower Garden!)
+            for(let i=0; i<400; i++) {
+                const flower = new THREE.Group();
+                // Stem
+                const stemMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+                const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), stemMat);
+                stem.position.y = 0.3;
+                flower.add(stem);
+                
+                // Petals
+                const colors = [0xff69b4, 0xffd700, 0xff4500, 0x8a2be2, 0xffffff, 0xff0000];
+                const petalColor = colors[Math.floor(Math.random() * colors.length)];
+                const petalMat = new THREE.MeshLambertMaterial({ color: petalColor });
+                const centerMat = new THREE.MeshLambertMaterial({ color: 0xffff00 });
+                
+                const center = new THREE.Mesh(new THREE.SphereGeometry(0.15), centerMat);
+                center.position.y = 0.6;
+                flower.add(center);
+                
+                for(let p=0; p<5; p++) {
+                    const petal = new THREE.Mesh(new THREE.SphereGeometry(0.15), petalMat);
+                    const angle = (p / 5) * Math.PI * 2;
+                    petal.position.set(Math.cos(angle)*0.2, 0.6, Math.sin(angle)*0.2);
+                    flower.add(petal);
+                }
+
+                // Plant them mostly along the path where the lion runs
+                const x = -20 + Math.random() * 150;
+                const z = (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random() * 10);
+                flower.position.set(x, 0, z);
+                scene.add(flower);
+            }
+
+            // Clouds
+            const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+            for(let i=0; i<10; i++) {
+                const cloud = new THREE.Group();
+                const numPuffs = 3 + Math.floor(Math.random() * 4);
+                for(let j=0; j<numPuffs; j++) {
+                    const puff = new THREE.Mesh(new THREE.SphereGeometry(1.5 + Math.random(), 8, 8), cloudMat);
+                    puff.position.set((Math.random()-0.5)*3, (Math.random()-0.5)*1, (Math.random()-0.5)*2);
+                    cloud.add(puff);
+                }
+                cloud.position.set((Math.random() - 0.5) * 80, 15 + Math.random() * 10, (Math.random() - 0.5) * 40);
+                scene.add(cloud);
+                clouds.push({ mesh: cloud, speed: 0.01 + Math.random() * 0.02 });
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            animClock += 0.05;
+
+            // Cloud animation
+            clouds.forEach(c => {
+                c.mesh.position.x -= c.speed;
+                if(c.mesh.position.x < -50) c.mesh.position.x = 50;
+            });
+
+            // Lion State Machine & Animation
+            if (lionGroup) {
+                // Movement logic
+                const dx = targetLionPosition.x - lionGroup.position.x;
+                const dz = targetLionPosition.z - lionGroup.position.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                
+                if (dist > 0.1) {
+                    lionGroup.position.x += dx * 0.05;
+                    lionGroup.position.z += dz * 0.05;
+                    // Look in direction of movement
+                    lionGroup.rotation.y = Math.atan2(-dz, dx);
+                    if(lionState !== 'jump') lionState = 'walk';
+                } else if (lionState === 'walk') {
+                    lionState = 'idle';
+                    lionGroup.rotation.y = 0; // face forward
+                }
+
+                updateCameraPosition(); // Keep camera tracking
+
+                // Body Animation based on state
+                const body = lionGroup.children[0]; // Assuming body is first child
+                const head = lionGroup.children[1]; 
+                
+                if (lionState === 'idle') {
+                    body.position.y = 1.2 + Math.sin(animClock * 0.5) * 0.05; // breathing
+                    head.rotation.y = Math.sin(animClock * 0.3) * 0.1;
+                    lionGroup.position.y = 0;
+                    lionGroup.rotation.z = 0;
+                } else if (lionState === 'walk') {
+                    lionGroup.position.y = Math.abs(Math.sin(animClock * 2)) * 0.3; // bouncing
+                    body.rotation.z = Math.PI/2 + Math.sin(animClock * 2) * 0.1;
+                    head.rotation.y = 0;
+                } else if (lionState === 'jump') {
+                    lionGroup.position.y = Math.abs(Math.sin(animClock * 3)) * 2; // high jump
+                    head.rotation.x = -Math.sin(animClock * 3) * 0.3;
+                    if(lionGroup.position.y < 0.1 && dist < 0.1) lionState = 'idle'; // end jump
+                } else if (lionState === 'shake') {
+                    lionGroup.position.y = 0;
+                    head.rotation.y = Math.sin(animClock * 5) * 0.4; // shake head fast
+                    setTimeout(() => { if(lionState==='shake') lionState='idle'; }, 1000);
+                }
+
+                // Tail animation
+                const tail = lionGroup.children[6]; // Approx index
+                if(tail) {
+                    tail.rotation.x = Math.sin(animClock * (lionState==='idle'?1:3)) * 0.2;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
