@@ -243,8 +243,8 @@
                 desc: "看清楚變數的長相，選對專屬的工具。",
                 question: "護士想知道「性別」跟「有沒有生病」有沒有關聯；同時白兔村想比較「兩組」白兔跳躍距離，但資料「嚴重偏態」。這兩個情境分別要用什麼？",
                 options: [
-                    { text: "A. 護士用「卡方獨立性檢定」；白兔村用「Mann-Whitney U 檢定」。", correct: true, explanation: "完美配對！探討兩個類別(性別 vs 有病/沒病)的關聯，要用「卡方獨立性」；而兩組比較但嚴重偏態(獨立樣本t的非參數備胎)，就是「Mann-Whitney U 檢定」！(另外如果是看實際比例是否1:1，則是用卡方適配度喔)" },
-                    { text: "B. 護士用「卡方適配度檢定」；白兔村用「配對樣本 t檢定」。", correct: false, explanation: "弄混囉！卡方適配度是用來測「實際比例是不是 1:1」；而配對樣本 t檢定必須是「同一批人」前後測，而且不能嚴重偏態喔。" }
+                    { text: "A. 護士用「卡方獨立性」；白兔村用「Mann-Whitney U 檢定」。", correct: true, explanation: "完美配對！探討兩個類別(性別 vs 有病/沒病)的關聯，要用「卡方獨立性」；而兩組比較但嚴重偏態(非參數備胎)，就是「Mann-Whitney U 檢定」！(如果是看實際比例是否1:1，則用卡方適配度喔)" },
+                    { text: "B. 護士用「卡方適配度」；白兔村用「配對樣本 t檢定」。", correct: false, explanation: "弄混囉！卡方適配度是用來測「比例是不是 1:1」；而配對樣本 t檢定必須是「同一批人」前後測，不能用在嚴重偏態喔。" }
                 ]
             },
             {
@@ -252,8 +252,44 @@
                 desc: "考試最愛考的觀念，一次全部閃過！",
                 question: "來到最後一關，牆上寫著兩段話。哪一段才是沒有踩到任何陷阱的「統計學真理」？",
                 options: [
-                    { text: "A. 「相關不代表因果」且「p ≤ α 才能拒絕HO (絕不說接受HO)」。", correct: true, explanation: "統計獅子王就是你！這兩句話是統計學鐵律！另外也要小心 CI 陷阱：95%信賴區間的意義是重複抽樣「包含母體」的比例，絕對不能解釋成「機率」喔！非參數三寶：U、Wilcoxon、Kruskal-Wallis 也要背熟！" },
-                    { text: "B. 「相關性很高代表有因果關係」且「95%信賴區間代表母體有95%的機率在裡面」。", correct: false, explanation: "轟隆隆！你踩到兩個最大的地雷啦！高度相關不一定是誰造成誰；而且母體參數是固定的數字，不會有機率問題，信賴區間不能用機率來解釋！" }
+                    { text: "A. 「相關不代表因果」且「p ≤ α 才能拒絕HO (絕不說接受HO)」。", correct: true, explanation: "統計獅子王就是你！這兩句話是統計學鐵律！另外小心 CI 陷阱：95%信賴區間是指重複抽樣「包含母體」的比例，不能解釋成機率！非參數三寶：U、Wilcoxon、Kruskal-Wallis也要背熟！" },
+                    { text: "B. 「相關性很高代表有因果關係」且「95%信賴區間代表母體有95%機率在裡面」。", correct: false, explanation: "轟隆隆！你踩到兩個最大的地雷啦！高度相關不一定是誰造成誰；而且母體參數是固定的數字，信賴區間絕對不能用機率來解釋！" }
+                ]
+            },
+            {
+                chapter: "第二十一關：皮爾森相關 (找直線)",
+                desc: "專抓直線關係的探測器，但它有致命盲點！",
+                question: "小獅子發現『學習時數』與『考試成績』算出來的皮爾森相關係數 (Pearson) 等於 0。這代表什麼？",
+                options: [
+                    { text: "A. 只代表沒有「直線」關係，但可能會有完美的 U 型曲線關係！", correct: true, explanation: "沒錯！這是超常考的陷阱！Pearson 只能偵測「直線」。如果是拋物線(U型)，算出來也會接近 0。所以 Pearson=0 絕對不代表「完全沒關係」喔！" },
+                    { text: "B. 代表兩者之間「完全沒有」任何關係。", correct: false, explanation: "掉進陷阱啦！皮爾森很笨，牠只看得懂直線，不懂轉彎。如果是拋物線關係，牠也會回報 0！" }
+                ]
+            },
+            {
+                chapter: "第二十二關：斯皮爾曼相關 (排名的魔法)",
+                desc: "當資料有極端值，或是題目只給你名次的時候...",
+                question: "森林賽跑，小獅子想研究大家的『名次』和『平常訓練時數』有沒有關聯，而且資料裡有幾隻超級慢的烏龜(離群值)。該用哪種相關係數？",
+                options: [
+                    { text: "A. 斯皮爾曼相關 (Spearman)", correct: true, explanation: "答對了！只要看到「排名、次序、極端值(離群值)」，就要召喚 Spearman！因為牠把數字轉成名次，所以對超級離群值完全免疫！" },
+                    { text: "B. 皮爾森相關 (Pearson)", correct: false, explanation: "不行喔～皮爾森很容易受到「超級慢的烏龜(離群值)」影響而被拉歪，而且如果是名次資料，用皮爾森也不適合。" }
+                ]
+            },
+            {
+                chapter: "第二十三關：卡方檢定 (類別大對決)",
+                desc: "如果連數字都沒有，只有「分類」該怎麼辦？",
+                question: "長老想知道「動物種類（獅子、兔子）」和「喜歡的食物（香蕉、蘋果）」之間有沒有關聯。這兩個都是「類別變數」，該派出誰？",
+                options: [
+                    { text: "A. 卡方獨立性檢定 (Chi-square test)", correct: true, explanation: "完美！只要看到兩個都是「類別/分類變數」(例如：男/女 與 有病/沒病)，要看他們有沒有關聯，就是卡方獨立性檢定登場的時候！" },
+                    { text: "B. 變異數分析 (ANOVA)", correct: false, explanation: "錯囉！ANOVA 是一組類別變數 (分三組以上) 配上一個連續變數 (例如：力氣大小數字)。兩個都是類別，必須用卡方！" }
+                ]
+            },
+            {
+                chapter: "第二十四關：因果關係的終極禁忌",
+                desc: "看到這幾個字眼，立刻刪掉選項！",
+                question: "小獅子發現「每天喝魔法水」與「毛髮生長速度」有高度正相關 (r=0.9)。牠可以寫下結論說：「魔法水『導致』毛髮生長」嗎？",
+                options: [
+                    { text: "A. 不行！統計學鐵律：「相關不代表因果」。只能說高度相關，絕對不能寫導致！", correct: true, explanation: "滿分畢業！考題只要出現「導致」、「造成」、「X讓Y改變」這種有方向性的詞，直接刪掉！統計只能證明他們有關係，不能證明是誰造成誰的！" },
+                    { text: "B. 可以！既然有高度正相關，就代表一定是魔法水造成的。", correct: false, explanation: "小獅子大崩潰！統計學的最高禁忌就是把「相關」當成「因果」。也許是有第三個原因(例如每天曬太陽)同時造成這兩件事呢！" }
                 ]
             }
         ];
@@ -273,7 +309,7 @@
             progressDots.innerHTML = '';
             levels.forEach((_, i) => {
                 const dot = document.createElement('div');
-                dot.className = `w-2.5 h-2.5 md:w-3 md:h-3 rounded-full ${i === 0 ? 'bg-orange-500' : 'bg-gray-300'}`;
+                dot.className = `w-2 h-2 md:w-2.5 md:h-2.5 rounded-full ${i === 0 ? 'bg-orange-500' : 'bg-gray-300'}`;
                 dot.id = `dot-${i}`;
                 progressDots.appendChild(dot);
             });
@@ -283,9 +319,9 @@
             levels.forEach((_, i) => {
                 const dot = document.getElementById(`dot-${i}`);
                 if(dot) {
-                    if (i < currentLevel) dot.className = 'w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-green-500';
-                    else if (i === currentLevel) dot.className = 'w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]';
-                    else dot.className = 'w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-gray-300';
+                    if (i < currentLevel) dot.className = 'w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-green-500';
+                    else if (i === currentLevel) dot.className = 'w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]';
+                    else dot.className = 'w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-gray-300';
                 }
             });
         }
@@ -369,9 +405,9 @@
         }
 
         function showEndScreen() {
-            titleEl.textContent = "冒險完成！你是統計獅子王！🦁👑";
-            descEl.textContent = "太厲害了！你已經完美掌握了統計學中最核心的假設檢定觀念。";
-            questionEl.textContent = "考試時記得：\n1. p ≤ α 拒絕HO \n2. ANOVA顯著≠兩兩有差 \n3. 相關不代表因果 \n祝你考試順利，拿滿分！吼～🎉";
+            titleEl.textContent = "冒險完成！你是真正的統計獅子王！🦁👑";
+            descEl.textContent = "太厲害了！從基本名詞到三大檢定、再到皮爾森與斯皮爾曼，你全部都精通了！";
+            questionEl.textContent = "考前最後叮嚀：\n1. Pearson=0 不代表沒關係，可能會有 U 型曲線！\n2. 看到「排名、極端值」秒選 Spearman！\n3. 相關絕對不能寫「導致」！\n祝你考試拿滿分！吼～🎉";
             feedbackEl.classList.add('hidden');
             
             optionsContainer.innerHTML = '';
