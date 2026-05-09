@@ -68,8 +68,8 @@
 
     <!-- Confetti / Success Overlay -->
     <div id="success-overlay" class="absolute inset-0 z-20 flex items-center justify-center bg-white/60 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-500">
-        <div class="bg-orange-400 text-white font-black text-center text-3xl md:text-5xl p-8 rounded-3xl shadow-2xl transform rotate-3 scale-110 border-8 border-yellow-300">
-            🦁 恭喜通關！<br><span class="text-2xl">小獅子為你加冕！👑🎉</span>
+        <div id="success-message" class="bg-green-500 text-white font-black text-center text-3xl md:text-5xl p-8 rounded-3xl shadow-2xl transform rotate-3 scale-110 border-8 border-green-300">
+            過關！太棒了！🎉
         </div>
     </div>
 
@@ -319,6 +319,8 @@
         ];
 
         let currentLevel = -1;
+        let mistakesCount = 0; // 記錄踩到陷阱的次數
+        let crownMesh = null; // 儲存 3D 皇冠物件
         
         // --- UI Logic ---
         const titleEl = document.getElementById('level-title');
@@ -352,6 +354,8 @@
 
         function startGame() {
             currentLevel = 0;
+            mistakesCount = 0;
+            if (crownMesh) crownMesh.visible = false; // 重新開始時隱藏皇冠
             initProgressDots();
             updateProgress();
             loadLevel();
@@ -397,53 +401,93 @@
                 msgBox.classList.add('border-green-400', 'bg-green-50');
                 lionState = 'jump';
                 
-                // Show overlay
+                // Show generic overlay
                 const overlay = document.getElementById('success-overlay');
+                const overlayMsg = document.getElementById('success-message');
+                overlayMsg.className = "bg-green-500 text-white font-black text-center text-3xl md:text-5xl p-8 rounded-3xl shadow-2xl transform rotate-3 scale-110 border-8 border-green-300";
+                overlayMsg.innerHTML = "過關！太棒了！🎉";
                 overlay.classList.remove('opacity-0', 'pointer-events-none');
                 
                 setTimeout(() => {
                     overlay.classList.add('opacity-0', 'pointer-events-none');
                     const nextBtn = document.createElement('button');
-                    nextBtn.className = "w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-green-700 animate-bounce";
-                    nextBtn.textContent = "前往下一關 ➔";
+                    nextBtn.className = "w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-green-700 animate-bounce mt-2";
+                    
+                    // 如果是最後一關，按鈕文字改變
+                    if (currentLevel === levels.length - 1) {
+                        nextBtn.textContent = "領取獅子王獎勵！👑 ➔";
+                    } else {
+                        nextBtn.textContent = "前往下一關 ➔";
+                    }
+
                     nextBtn.onclick = () => {
                         currentLevel++;
                         updateProgress();
                         loadLevel();
                     };
                     optionsContainer.appendChild(nextBtn);
-                }, 1500);
+                }, 1000); // 一般過關提示縮短為1秒
 
             } else {
                 // Wrong
+                mistakesCount++; // 增加失誤計數
                 msgBox.classList.remove('border-yellow-400', 'bg-yellow-100');
                 msgBox.classList.add('border-red-400', 'bg-red-50');
                 lionState = 'shake';
                 
                 const retryBtn = document.createElement('button');
-                retryBtn.className = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-red-700";
-                retryBtn.textContent = "再試一次 ↺";
+                retryBtn.className = "w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-red-700 mt-2";
+                retryBtn.textContent = "記住陷阱，再試一次 ↺";
                 retryBtn.onclick = () => loadLevel(); // Reload same level
                 optionsContainer.appendChild(retryBtn);
             }
         }
 
         function showEndScreen() {
-            titleEl.textContent = "冒險完成！你是真正的統計獅子王！🦁👑";
-            descEl.textContent = "太厲害了！從基本名詞到三大檢定、再到皮爾森與斯皮爾曼，你全部都精通了！";
-            questionEl.textContent = "考前最後叮嚀：\n1. Pearson=0 不代表沒關係，可能會有 U 型曲線！\n2. 看到「排名、極端值」秒選 Spearman！\n3. 相關絕對不能寫「導致」！\n祝你考試拿滿分！吼～🎉";
+            // 根據失誤次數給予不同評價
+            let titleText = "";
+            let descText = "";
+            
+            if (mistakesCount === 0) {
+                titleText = "冒險完成！傳說中的完美獅子王！👑🦁";
+                descText = "太不可思議了！你竟然一題都沒錯，完美閃避了所有的統計學陷阱！你已經是個大師了！";
+            } else if (mistakesCount <= 5) {
+                titleText = "冒險完成！優秀的皇家統計獅！🦁✨";
+                descText = `表現得非常好！雖然踩到了 ${mistakesCount} 個小陷阱，但你已經掌握了絕大部分的核心觀念！`;
+            } else {
+                titleText = "冒險完成！努力不懈的勇氣小獅！🦁💪";
+                descText = `你總共挑戰了 ${mistakesCount} 次陷阱，但也因此學到了更多！多複習幾次，下次一定能成為完美的獅子王！`;
+            }
+
+            titleEl.textContent = titleText;
+            descEl.textContent = descText;
+            questionEl.textContent = "考前最後叮嚀：\n1. Pearson=0 不代表沒關係，可能有 U 型曲線！\n2. 看到「排名、極端值」秒選 Spearman！\n3. 相關絕對不能寫「導致」！\n祝你考試拿滿分！吼～🎉";
             feedbackEl.classList.add('hidden');
             
             optionsContainer.innerHTML = '';
             const restartBtn = document.createElement('button');
             restartBtn.className = "w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-full text-xl shadow-lg transform hover:scale-105 transition-all border-b-4 border-blue-700";
-            restartBtn.textContent = "重新複習 ↺";
+            restartBtn.textContent = "再次挑戰，爭取完美零失誤！ ↺";
             restartBtn.onclick = startGame;
             optionsContainer.appendChild(restartBtn);
 
-            lionState = 'jump'; // Happy lion
+            // 讓小獅子戴上皇冠並跳躍慶祝！
+            if (crownMesh) crownMesh.visible = true;
+            lionState = 'jump'; 
             targetLionPosition.x = 0;
             targetLionPosition.z = 2;
+
+            // 顯示最終的豪華加冕 Overlay
+            const overlay = document.getElementById('success-overlay');
+            const overlayMsg = document.getElementById('success-message');
+            overlayMsg.className = "bg-orange-400 text-white font-black text-center text-3xl md:text-5xl p-8 rounded-3xl shadow-2xl transform rotate-3 scale-110 border-8 border-yellow-300";
+            overlayMsg.innerHTML = `🦁 恭喜完全通關！<br><span class="text-2xl mt-4 block">為你戴上榮耀的皇冠！👑🎉</span>`;
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+            
+            // 慶祝畫面停留久一點
+            setTimeout(() => {
+                overlay.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
         }
 
         // --- Three.js 3D Setup ---
@@ -655,6 +699,23 @@
                 puff.position.set(-0.4, Math.cos(angle)*0.5, Math.sin(angle)*0.5);
                 headGroup.add(puff);
             }
+
+            // === THE CROWN === (Hidden initially)
+            const crownGeo = new THREE.CylinderGeometry(0.3, 0.25, 0.35, 8);
+            const crownMaterial = new THREE.MeshLambertMaterial({ color: 0xffd700 }); // Gold
+            crownMesh = new THREE.Mesh(crownGeo, crownMaterial);
+            crownMesh.position.set(0, 0.75, 0);
+            
+            // Add some red jewels to the crown
+            const jewelMat = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+            for(let i=0; i<6; i++) {
+                const jewel = new THREE.Mesh(new THREE.SphereGeometry(0.06), jewelMat);
+                const angle = (i / 6) * Math.PI * 2;
+                jewel.position.set(Math.cos(angle)*0.3, 0.15, Math.sin(angle)*0.3);
+                crownMesh.add(jewel);
+            }
+            crownMesh.visible = false; // Hide until the end screen
+            headGroup.add(crownMesh);
 
             lionGroup.add(headGroup);
 
